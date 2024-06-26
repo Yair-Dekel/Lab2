@@ -23,14 +23,7 @@
 #include <QApplication>*/
 
 
-#define GA_MAXITER		 200			// maximum iterations
-#define GA_ELITRATE		 0.05f		    // elitism rate
-#define GA_MUTATIONRATE	 0.4f		    // mutation rate
-#define GA_MUTATION		 RAND_MAX * GA_MUTATIONRATE
-#define GA_TARGET		 std::string("Hello world!")
-#define MAX_AGE          3
-#define REPRODUCE_THRESH 1
-#define BIN_MAX_CAPACITY 10
+
 
 using namespace std;				// polluting global namespace, but hey...
 
@@ -513,8 +506,8 @@ sudoku sudoku_vec::crossover_PMX(int i1, int i2)
 		int second = parent2.get_board_cell(i,spos); // Save the value to be replaced
 		for(int j=0; j<tsize; j++){
 			if(parent1.get_board_cell(i,j) == second && !parent1.get_steel_numbers(i,j)){ 
-                child.set_board(i,spos,second); 
-                child.set_board(i,j,first); 
+                child.set_board(i, spos, second); 
+                child.set_board(i, j, first); 
                 break;
             }
         }
@@ -657,7 +650,7 @@ void sudoku_vec::tournament_selection(int K, double P, int &selected_index) {
     for (int i = 0; i < K; ++i) {        
         ///Randomly select an individual from the population
         int index = rand() % vec.size();
-        const sudoku& competitor = vec[index];
+        sudoku competitor = vec[index];
 
         ///Determine if the competitor wins the current round of the tournament based on probability P
         if (    (((double)rand() / RAND_MAX) < P) 

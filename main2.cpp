@@ -23,14 +23,7 @@
 #include <QApplication>*/
 
 
-#define GA_POPSIZE		 750		    // ga population size
-#define GA_MAXITER		 100			// maximum iterations
-#define GA_ELITRATE		 0.05f		    // elitism rate
-#define GA_MUTATIONRATE	 0.25f		    // mutation rate
-#define GA_MUTATION		 RAND_MAX * GA_MUTATIONRATE
-#define GA_TARGET		 std::string("Hello world!")
-#define MAX_AGE          5
-#define REPRODUCE_THRESH 3
+
 #define BIN_MAX_CAPACITY 100
 
 using namespace std;				// polluting global namespace, but hey...
@@ -196,6 +189,14 @@ void bins::init_bins(std::vector<int> items, flags flag){
     std::mt19937 g(rd());
     std::uniform_int_distribution<> dist(1, 100);
 
+    std::cout << "flag.shuffle_F: " << flag.shuffle_F << std::endl;
+    std::cout << "flag.random_F: " << flag.random_F << std::endl;
+    std::cout << "flag.greedy_F: " << flag.greedy_F << std::endl;
+    std::cout << "flag.best_fit_F: " << flag.best_fit_F << std::endl;
+    std::cout << "flag.worst_fit_F: " << flag.worst_fit_F << std::endl;
+    std::cout << "flag.fit_F: " << flag.fit_F << std::endl;
+
+
     // Shuffle the vector
     if(flag.shuffle_F)
         std::shuffle(items.begin(), items.end(), g);
@@ -214,7 +215,7 @@ void bins::init_bins(std::vector<int> items, flags flag){
     if(flag.fit_F)
         i = dist(g);
 
-
+    std::cout << "i: " << i << std::endl;
 
     if (i > 0 || i < 25)
         this->random_init(items);
@@ -242,6 +243,7 @@ void bins::init_bins(std::vector<int> items, flags flag){
             this->worst_fit_init(items);
     }
 
+    this->print_bins();
 
     this->calc_fitness();
 }
@@ -464,8 +466,8 @@ class bin_vec
     public:
         flags flag;
         bin_vec();
-        bin_vec(std::vector<int> items,std::multiset<int> item_set, int size, int capacity);
-        bin_vec(std::multiset<int> item_set, int capacity);    
+        bin_vec(std::vector<int> items,std::multiset<int> item_set, int size, int capacity, flags flag);
+        bin_vec(std::multiset<int> item_set, int capacity, flags flag);    
         bin_vec(const bin_vec &b);
         bin_vec& operator=(const bin_vec &b);
         ~bin_vec();
@@ -503,11 +505,12 @@ bin_vec::bin_vec()
     pop.resize(GA_POPSIZE);
 }
 
-bin_vec::bin_vec(std::vector<int> items,std::multiset<int> item_set, int size, int capacity)
+bin_vec::bin_vec(std::vector<int> items,std::multiset<int> item_set, int size, int capacity, flags flag)
 {
     pop.resize(size);
     this->items_set = item_set;
     this->capacity = capacity;
+    this->flag = flag;
     for (int i = 0; i < size; i++){
         bins b(capacity);
         b.init_bins(items, flag);
@@ -515,9 +518,10 @@ bin_vec::bin_vec(std::vector<int> items,std::multiset<int> item_set, int size, i
     }
 }
 
-bin_vec::bin_vec(std::multiset<int> item_set, int capacity)
+bin_vec::bin_vec(std::multiset<int> item_set, int capacity, flags flag)
 {
     pop.resize(GA_POPSIZE);
+    this->flag = flag;
     this->items_set = item_set;
     this->capacity = capacity;
 }
@@ -712,7 +716,7 @@ void bin_vec::tournament_selection(int K, double P, int &selected_index) {
     for (int i = 0; i < K; ++i) {        
         ///Randomly select an individual from the population
         int index = rand() % pop.size();
-        const bins& competitor = pop[index];
+        bins competitor = pop[index];
 
         ///Determine if the competitor wins the current round of the tournament based on probability P
         if (    (((double)rand() / RAND_MAX) < P) 
@@ -766,6 +770,7 @@ int bin_vec::calc_number_of_different_alleles(){
         }
         alleles.insert(bins);
     }
+
     return alleles.size();
 }
 
@@ -979,8 +984,10 @@ int main (int argc, char* argv[])
 
     items_set.insert(items.begin(), items.end());
 
-    bin_vec pop(items, items_set, GA_POPSIZE, capacities[index]);
-    bin_vec buffer(items_set, capacities[index]);
+    
+    
+    bin_vec pop(items, items_set, GA_POPSIZE, capacities[index], flag);
+    bin_vec buffer(items_set, capacities[index], flag);
     bin_vec *population = &pop;
     bin_vec *buffer_ptr = &buffer;
     population->flag = flag;

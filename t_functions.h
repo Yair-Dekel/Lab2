@@ -2,9 +2,15 @@
 #include <vector>
 #include <fstream>
 
-
-#define GA_POPSIZE		 750		    // ga population size
+#define GA_MAXITER		 3			// maximum iterations
+#define GA_POPSIZE		 30		    // ga population size
 #define GA_ELITRATE		 0.05f		    // elitism rate
+#define GA_ELITRATE		 0.05f		    // elitism rate
+#define GA_MUTATIONRATE	 0.4f		    // mutation rate
+#define GA_MUTATION		 RAND_MAX * GA_MUTATIONRATE
+#define GA_TARGET		 std::string("Hello world!")
+#define MAX_AGE          3
+#define REPRODUCE_THRESH 1
 
 
 template <typename T>
