@@ -7,9 +7,9 @@ def read_numbers_from_file(file_path):
 
 def plot_numbers(numbers, file_path):
     plt.figure(figsize=(10, 5))
-    plt.plot(numbers, marker='o', linestyle='-', color='b')
+    plt.plot(numbers, marker='o', linestyle='-')
     #plt.title('distance over 80 generations SUDOKU')
-    plt.title(file_path + ' 200 generations')
+    plt.title(file_path + ' 500 generations')
     plt.xlabel('Generation')
     plt.ylabel('Value')
     plt.grid(True)
@@ -20,10 +20,10 @@ def plot_numbers(numbers, file_path):
 #this code takes a file of data and plots it 
 
 if __name__ == "__main__":
-    file_path = 'average_gene_distance_sudoku.txt'  # path to your file
+    file_path = 'incorrect.txt'  # path to your file
     numbers = read_numbers_from_file(file_path)
     plot_numbers(numbers, file_path)
-    file_path = 'variance_BINS.txt'  # path to your file
+    '''file_path = 'variance_BINS.txt'  # path to your file
     numbers = read_numbers_from_file(file_path)
     plot_numbers(numbers, file_path)
     file_path = 'average_BINS.txt'  # path to your file
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     plot_numbers(numbers, file_path)
     file_path = 'fitness_BINS.txt'  # path to your file
     numbers = read_numbers_from_file(file_path)
-    plot_numbers(numbers, file_path)    
+    plot_numbers(numbers, file_path) '''   
 
     
 

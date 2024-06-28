@@ -2,8 +2,8 @@
 #include <vector>
 #include <fstream>
 
-#define GA_MAXITER		 3			// maximum iterations
-#define GA_POPSIZE		 30		    // ga population size
+#define GA_MAXITER		 500			// maximum iterations
+#define GA_POPSIZE		 1000		    // ga population size
 #define GA_ELITRATE		 0.05f		    // elitism rate
 #define GA_ELITRATE		 0.05f		    // elitism rate
 #define GA_MUTATIONRATE	 0.4f		    // mutation rate
@@ -92,7 +92,7 @@ void mate(T &pop, T &buffer)
     int esize = GA_POPSIZE * GA_ELITRATE;
     
     std::vector<int> parents;
-    if(pop.get_flags().get_elitism_F())elitism(pop, buffer, esize);
+    if(pop.get_flags().get_elitism_F()) elitism(pop, buffer, esize);
     else esize = 0;
 
     if(pop.get_flags().get_SUS_F()){
