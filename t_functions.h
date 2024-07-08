@@ -126,6 +126,38 @@ void mate(T &pop, T &buffer)
     }
 }
 
+template <typename T, typename C>
+void non_deternistic_crowding(T &pop, T &buffer, const C &individual)
+{
+    int esize = GA_POPSIZE * GA_ELITRATE;
+    elitism(pop, buffer, esize);
+    for (int i = esize; i < GA_POPSIZE; i++){
+        
+        int parent1;
+        int parent2;
+        pop.parent_selection_RWS(parent1);
+        pop.parent_selection_RWS(parent2);
+
+        C parent = pop.get(i);
+        C child = pop.mate(parent1, parent2);
+        if(boltzmann_replacement(parent, child)){
+            buffer.set(i, child);
+        }
+        else{
+            i--;
+        }
+    }
+}
+
+template <typename C>
+bool boltzmann_replacement(const C &parent1, const C &offspring) {
+
+    double T = 1.0;
+    double expo = exp((-std::abs(static_cast<double>(parent1.get_fitness()) - static_cast<double>(offspring.get_fitness()))) / T);
+    double p = expo / (1 + expo);
+    double r = static_cast<double>(rand()) / RAND_MAX;
+    return r < p;
+}
 template <typename T>
 void swap(T *&population, T *&buffer)
 {
@@ -150,6 +182,8 @@ class flags
     bool linear_scaling_F, tournament_F, mutation_F;
     bool best_fit_F, worst_fit_F, random_F, greedy_F, shuffle_F, fit_F;
     bool single_point_F, two_point_F, uniform_F, rand_crossover_F;
+
+    bool learning_F;
     flags();
     flags(const flags &f);
     flags& operator=(const flags &f);
@@ -183,6 +217,8 @@ flags::flags()
     two_point_F = false;
     uniform_F = false;
     rand_crossover_F = true;
+
+    learning_F = true;
 }
 
 flags::flags(const flags &f)
@@ -210,7 +246,7 @@ flags::flags(const flags &f)
     this->uniform_F = f.uniform_F;
     this->rand_crossover_F = f.rand_crossover_F;
 
-
+    this->learning_F = f.learning_F;
 }
 
 flags& flags::operator=(const flags &f)
@@ -240,6 +276,8 @@ flags& flags::operator=(const flags &f)
     this->two_point_F = f.two_point_F;
     this->uniform_F = f.uniform_F;
     this->rand_crossover_F = f.rand_crossover_F;
+
+    this->learning_F = f.learning_F;
     return *this;
 }
 

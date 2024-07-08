@@ -105,6 +105,7 @@ class bins{
         void push_rest(std::multiset<int> items_set);
         void update_remain_capacity();
         std::vector<int> reduction_to_vector();
+        void repair_vector(std::vector<int> items);
 
 };
 
@@ -189,13 +190,13 @@ void bins::init_bins(std::vector<int> items, flags flag){
     std::mt19937 g(rd());
     std::uniform_int_distribution<> dist(1, 100);
 
-    std::cout << "flag.shuffle_F: " << flag.shuffle_F << std::endl;
+ /*   std::cout << "flag.shuffle_F: " << flag.shuffle_F << std::endl;
     std::cout << "flag.random_F: " << flag.random_F << std::endl;
     std::cout << "flag.greedy_F: " << flag.greedy_F << std::endl;
     std::cout << "flag.best_fit_F: " << flag.best_fit_F << std::endl;
     std::cout << "flag.worst_fit_F: " << flag.worst_fit_F << std::endl;
     std::cout << "flag.fit_F: " << flag.fit_F << std::endl;
-
+*/
 
     // Shuffle the vector
     if(flag.shuffle_F)
@@ -215,7 +216,7 @@ void bins::init_bins(std::vector<int> items, flags flag){
     if(flag.fit_F)
         i = dist(g);
 
-    std::cout << "i: " << i << std::endl;
+    //std::cout << "i: " << i << std::endl;
 
     if (i > 0 || i < 25)
         this->random_init(items);
@@ -243,7 +244,7 @@ void bins::init_bins(std::vector<int> items, flags flag){
             this->worst_fit_init(items);
     }
 
-    this->print_bins();
+    //this->print_bins();
 
     this->calc_fitness();
 }
@@ -370,6 +371,8 @@ void bins::calc_fitness(){
         for (int j = 0; j < bins_vec[i].items.size(); j++){
             sum += bins_vec[i].items[j];
         }
+        if (sum < max_capacity) fitness ++;
+            
         fitness += abs(sum - max_capacity);
     }
 }
@@ -381,13 +384,11 @@ bins bins::single_point_crossover(const bins &parent2, std::multiset<int> items_
     
     this->bins_vec.erase(start_erase, this->bins_vec.end());
 
-    //std::cout << "i am in cross" << std::endl;
 
     for (int i = cross_point; i < parent2.bins_vec.size(); i++){
         this->bins_vec.push_back(parent2.bins_vec[i]);
     }
 
-    //std::cout << "i am in cross2" << std::endl;
 
 
     for (int i = 0; i < this->bins_vec.size(); i++){
@@ -452,6 +453,26 @@ std::vector<int> bins::reduction_to_vector(){
         }
     }
     return items;
+}
+
+void bins::repair_vector(std::vector<int> items){
+    bins_vec.clear();
+    bin b(max_capacity);
+    bins_vec.push_back(b);
+    for (int i = 0; i < items.size(); i++){
+        if (bins_vec.back().remain_capacity >= items[i]){
+            bins_vec.back().items.push_back(items[i]);
+            bins_vec.back().remain_capacity -= items[i];
+        }
+        else{
+            bin b(max_capacity);
+            bins_vec.push_back(b);
+            bins_vec.back().items.push_back(items[i]);
+            bins_vec.back().remain_capacity -= items[i];
+        }
+    }
+    num_items = items.size();
+    this->calc_fitness();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -623,6 +644,20 @@ bins bin_vec::mate(int parent1, int parent2)
     flag.fit_F = true;
 
     child.init_bins(items, flag);
+
+    if(flag.mutation_F){
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::uniform_int_distribution<> dist(1, 100);
+        int i = dist(g);
+        if(i > 0 && i < 10){
+            std::vector<int> items = child.reduction_to_vector();
+            int j = rand() % items.size();
+            int k = rand() % items.size();
+            std::swap(items[j], items[k]);
+            child.repair_vector(items);
+        }
+    }
         
     return child;
 }

@@ -985,12 +985,14 @@ int main(int argc, char* argv[])
         if (population->get_best().get_fitness() == 0){
             break;
         }
-        mate(*population, *buffer_ptr);
-        
+        //mate(*population, *buffer_ptr);
+        non_deternistic_crowding(*population, *buffer_ptr, population->get_best());
+
         swap(population, buffer_ptr);
         
                 
     }
+
 
     write_numbers_to_file("average_gene_distance_sudoku.txt", average_gene_distance);
     write_numbers_to_file("variance_sudoku.txt", variance);

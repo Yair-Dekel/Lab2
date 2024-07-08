@@ -21,6 +21,7 @@
 
 #define BALD_STRING  "01110100110101001010"
 #define MAX_LEARNING 1000
+#define LEARN        1      // 1 for learning, 0 for no learning
 
 using namespace std;
 
@@ -34,7 +35,8 @@ public:
     baldwin();
     double get_fitness() { return fitness; }
     void calc_fitness(int learning);
-    void init_str();
+    void calc_fitness_without_learning();
+    void init_str(bool learning);
     std::string get_str() { return str; }
     void set_str(std::string s) { str = s; }
     void learn();
@@ -52,7 +54,18 @@ void baldwin::calc_fitness(int learning)
     fitness = 1 + double(19 * learning) / MAX_LEARNING;
 }
 
-void baldwin::init_str(){
+void baldwin::calc_fitness_without_learning()
+{
+    for (int i = 0; i < str.size(); i++)
+    {
+        if (str[i] == BALD_STRING[i])
+        {
+            fitness++;
+        }
+    }
+}
+
+void baldwin::init_str(bool learning_F){
      // Random number generation setup
     random_device rd; // Obtain a random number from hardware
     mt19937 gen(rd()); // Seed the generator
@@ -105,7 +118,8 @@ void baldwin::init_str(){
         }
     }
 
-    learn();
+    if(learning_F) learn();
+    else calc_fitness_without_learning();
 }
 
 void baldwin::learn()
@@ -206,6 +220,8 @@ public:
     baldwin uniform_crossover(int p1, int p2);
     double mean_correct_position_percentage();
     double mean_incorrect_position_percentage();
+
+    void set_learning_F(bool learning_F) { flag.learning_F = learning_F; }
 };
 
 baldwin_vec::baldwin_vec()
@@ -240,8 +256,8 @@ void baldwin_vec::init_pop()
 {
     for (int i = 0; i < pop.size(); ++i)
     {
-        pop[i].init_str();
-        std::cout << "Individual " << i << " : " << pop[i].get_str() << std::endl;
+        pop[i].init_str(flag.learning_F);
+       
     }
     
 }
@@ -365,7 +381,8 @@ baldwin baldwin_vec::mate(int p1, int p2)
     else if (cross == 3) child = uniform_crossover(p1, p2);  
 
 
-    child.learn();
+    if(flag.learning_F) child.learn();
+    else child.calc_fitness_without_learning();
 
     //std::cout << child.get_str() << std::endl;
 
@@ -463,14 +480,22 @@ void write_numbers_to_file(const std::string &filename, const std::vector<int> &
 }
 
 
-int main()
+int main(int argc, char *argv[])
 {
+    bool learning_F = LEARN;
+    if (argc > 1){
+        if (strcmp(argv[1], "-nlearn") == 0){
+            learning_F = false;
+        }
+    }
         
     baldwin_vec pop;
     baldwin_vec buffer;
     baldwin_vec *population = &pop;
     baldwin_vec *buffer_ptr = &buffer;
     
+    pop.set_learning_F(learning_F);
+    buffer.set_learning_F(learning_F);
     pop.init_pop();
 
     std::vector<double> correct;
