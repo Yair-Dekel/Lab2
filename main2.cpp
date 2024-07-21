@@ -78,6 +78,7 @@ class bins{
         int num_items;
         int fitness;
         int age;
+        double fitness_share;
     public:
         bins();
         bins(int max_capacity);
@@ -106,6 +107,14 @@ class bins{
         void update_remain_capacity();
         std::vector<int> reduction_to_vector();
         void repair_vector(std::vector<int> items);
+
+        void set_fitness_share(double fitness_share){
+            this->fitness_share = fitness_share;
+        }
+        double get_fitness_share(){
+            return fitness_share;
+        }
+
 
 };
 
@@ -519,6 +528,10 @@ class bin_vec
             return flag;
         }
 
+        int distance_between_two_bins(bins b1, bins b2);
+        std::vector<std::vector<int>> distance_matrix();
+        std::vector<std::vector<double>> shared_distance_matrix(std::vector<std::vector<int>> &distance_matrix, double sigma_share);
+
 };
 
 bin_vec::bin_vec()
@@ -536,6 +549,7 @@ bin_vec::bin_vec(std::vector<int> items,std::multiset<int> item_set, int size, i
         bins b(capacity);
         b.init_bins(items, flag);
         pop[i] = b;
+        pop[i].set_fitness_share(pop[i].get_fitness());
     }
 }
 
@@ -808,6 +822,57 @@ int bin_vec::calc_number_of_different_alleles(){
 
     return alleles.size();
 }
+
+int bin_vec::distance_between_two_bins(bins b1, bins b2){
+    int distance = 0;
+    std::vector<int> items1 = b1.reduction_to_vector();
+    std::vector<int> items2 = b2.reduction_to_vector();
+    
+    for(int i = 0; i < items1.size(); i++){
+        if(items1[i] != items2[i]){
+            int temp = items2[i];
+            // Find the index of the item in the second vector
+            int index = -1;
+            for(int j = i; j < items2.size(); j++){
+                if(items2[j] == items1[i]){
+                    index = j;
+                    break;
+                }
+            }
+            // Swap the items
+            items2[index] = temp;
+            distance++;
+        }
+    }
+
+    return distance;
+}
+
+std::vector<std::vector<int>> bin_vec::distance_matrix(){
+    std::vector<std::vector<int>> distance_matrix(pop.size(), std::vector<int>(pop.size(), 0));
+    for(int i = 0; i < pop.size(); i++){
+        for(int j = i+1; j < pop.size(); j++){
+            distance_matrix[i][j] = distance_between_two_bins(pop[i], pop[j]);
+            distance_matrix[j][i] = distance_matrix[i][j];
+        }
+    }
+    return distance_matrix;
+}
+
+std::vector<std::vector<double>> bin_vec::shared_distance_matrix(std::vector<std::vector<int>> &distance_matrix, double sigma_share){
+    std::vector<std::vector<double>> shared_distance_matrix(pop.size(), std::vector<double>(pop.size(), 0));
+    for(int i = 0; i < pop.size(); i++){
+        for(int j = i; j < pop.size(); j++){
+            if (distance_matrix[i][j] <= sigma_share){                
+                shared_distance_matrix[i][j] = 1 - distance_matrix[i][j] / sigma_share;
+                shared_distance_matrix[j][i] = shared_distance_matrix[i][j];
+            }
+        }
+    }
+    return shared_distance_matrix;
+}
+
+
 
 ///********************************************************************************************************************************************************************
 
