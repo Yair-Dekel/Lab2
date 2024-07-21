@@ -6,6 +6,7 @@
 #include <algorithm>				// for sort algorithm
 #include <time.h>					// for random seed
 #include <math.h>					// for abs()
+#include <cmath>
 #include <chrono>
 #include <string.h>
 #include <cstring>
@@ -23,13 +24,33 @@
 #include <QApplication>*/
 
 
-
+// #define GA_MAXITER		 200			// maximum iterations
+// #define GA_ELITRATE		 0.05f		    // elitism rate
+// #define GA_MUTATIONRATE	 0.4f		    // mutation rate
+// #define GA_MUTATION		 RAND_MAX * GA_MUTATIONRATE
+// #define GA_TARGET		 std::string("Hello world!")
+// #define MAX_AGE          3
+// #define REPRODUCE_THRESH 1
+// #define BIN_MAX_CAPACITY 10
 
 using namespace std;				// polluting global namespace, but hey...
 
 
 
 /////**********************************************************************************/////
+
+static int mutation_rate_flag;
+static vector<double> preset_data;
+static double value_to_insrt = 0.0 ;
+static int value_to_insrtcounter = 0;
+static int curr_fitness;
+static int global_counter = 0;
+static int alils_number = 0;
+
+static int prev_best_fitness=1000;
+static int curr_best_fitness=1000;
+
+static double SF_GLOB; 
 
 
 class sudoku
@@ -336,6 +357,7 @@ void sudoku::init_board()
 
 /////**********************************************************************************/////
 
+//population
 
 class sudoku_vec
 {
@@ -343,6 +365,8 @@ private:
     std::vector<sudoku> vec;
     std::vector<int> linear_scaled_fitnesses;
     flags flag;
+    int generation_number;
+
 public:
     sudoku_vec(sudoku s, int size);
     sudoku_vec(int size);
@@ -353,6 +377,14 @@ public:
     sudoku mate(int parent1, int parent2);
     void set(int i, sudoku s);
     sudoku get(int i);
+
+/************************************************************** */
+    void set_generation_number(int GN);
+    double calc_relative_fitness(const sudoku& individual);
+    double set_mutation_probability_individual(sudoku& individual);
+    double calc_SF();
+/************************************************************** */
+
     sudoku crossover_PMX(int parent1, int parent2);
     sudoku crossover_CX(int parent1, int parent2);
     void increase_age(int i);
@@ -370,6 +402,11 @@ public:
     double calc_fitness_variance(double mean);
 
 };
+
+void sudoku_vec::set_generation_number(int GN){
+    generation_number = GN;
+}
+
 
 sudoku_vec::sudoku_vec(sudoku sud, int size)
 {
@@ -448,10 +485,62 @@ sudoku sudoku_vec::get_best()
     return vec[0];
 }
 
+
+
+//--------------------------------------------------------------------------------------------------------------
+
+
+/// the relative fitness calculation
+double sudoku_vec::calc_relative_fitness(const sudoku& individual) {
+    int fitness_sum = calc_fitness_sum();
+    int count = vec.size();
+    
+    double mean = static_cast<double>(fitness_sum) / count;
+    double Rf = static_cast<double>(individual.get_fitness()) / mean;
+    
+    /// normalize
+    
+    double SF = 0;
+    
+    SF = SF_GLOB;
+
+    double norm_Rf = Rf / SF;
+    
+    return norm_Rf;
+
+}
+
+double sudoku_vec::calc_SF(){
+    int fitness_sum = calc_fitness_sum();
+    int count = vec.size();
+    double mean = static_cast<double>(fitness_sum) / count;
+    double SF = 0;
+    for(sudoku itm: vec){
+        SF = SF + (itm.get_fitness()/ mean);
+    } 
+    return SF;
+}
+
+
+/// based on the relative fitness we are setting the mutation probability value 
+double sudoku_vec::set_mutation_probability_individual(sudoku& individual) {
+    
+    double max_mutation_probability = GA_MUTATIONRATE;
+    double relative_fitness = calc_relative_fitness(individual);
+    
+    double individual_mutation_probability = max_mutation_probability * (1.0 - relative_fitness);
+    
+    
+    return individual_mutation_probability;
+
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+
 sudoku sudoku_vec::mate(int parent1, int parent2)
 {
 
-    
     int i1 = rand() % 2;
 
     sudoku child;
@@ -460,11 +549,88 @@ sudoku sudoku_vec::mate(int parent1, int parent2)
     else
         child = crossover_PMX(parent1,parent2);
     
-    if (rand() < GA_MUTATION && flag.mutation_F) 
-        child.mutate();
-		
-    return child;   
+    
+    if(mutation_rate_flag == 1){
+
+        if (rand() < GA_MUTATION && flag.mutation_F){
+            child.mutate();
+        }
+
+    }
+    else if(mutation_rate_flag == 2){
+        
+        double mutation_rate =  Non_Unform_Mutation(generation_number);
+        
+
+        int mutation_threshold = mutation_rate * RAND_MAX;
+
+        if (rand() < mutation_threshold && flag.mutation_F){ 
+            child.mutate();
+        }
+    
+    }
+    else if(mutation_rate_flag == 3){
+        
+        int alleles = alils_number;
+        
+
+        int threshold_smaller = 500;
+        int threshold_biger = 700;
+        double mutation_rate = GA_MUTATIONRATE;
+        if(alleles < threshold_smaller){
+            mutation_rate = 0.8;
+        }
+        else if(alleles > threshold_biger){
+            mutation_rate = 0.2;
+
+        }
+
+        int mutation_threshold = mutation_rate * RAND_MAX;
+        
+        if (rand() < mutation_threshold && flag.mutation_F){
+            child.mutate();
+        } 
+
+    }
+    else if(mutation_rate_flag == 4){
+          
+        double mutation_rate = GA_MUTATIONRATE;
+
+        if(global_counter >= 5){
+
+            mutation_rate = 0.9f;
+            
+
+            if((global_counter > 25)){
+                
+                mutation_rate = GA_MUTATIONRATE;
+                global_counter = 0;
+            }
+        }
+
+        int mutation_threshold = mutation_rate * RAND_MAX;
+        
+        if (rand() < mutation_threshold && flag.mutation_F){
+           
+            child.mutate();
+        } 
+        
+    }
+    else if(mutation_rate_flag == 5){
+        double prob_mutation = set_mutation_probability_individual(child);
+        double mutation_threshold = prob_mutation * RAND_MAX;
+
+        
+        if (rand() < mutation_threshold && flag.mutation_F) 
+            child.mutate();  
+
+    }
+
+    return child;
 }
+
+
+
 
 void sudoku_vec::set(int i, sudoku s)
 {
@@ -506,8 +672,8 @@ sudoku sudoku_vec::crossover_PMX(int i1, int i2)
 		int second = parent2.get_board_cell(i,spos); // Save the value to be replaced
 		for(int j=0; j<tsize; j++){
 			if(parent1.get_board_cell(i,j) == second && !parent1.get_steel_numbers(i,j)){ 
-                child.set_board(i, spos, second); 
-                child.set_board(i, j, first); 
+                child.set_board(i,spos,second); 
+                child.set_board(i,j,first); 
                 break;
             }
         }
@@ -650,7 +816,7 @@ void sudoku_vec::tournament_selection(int K, double P, int &selected_index) {
     for (int i = 0; i < K; ++i) {        
         ///Randomly select an individual from the population
         int index = rand() % vec.size();
-        sudoku competitor = vec[index];
+        const sudoku& competitor = vec[index];
 
         ///Determine if the competitor wins the current round of the tournament based on probability P
         if (    (((double)rand() / RAND_MAX) < P) 
@@ -967,41 +1133,74 @@ int main(int argc, char* argv[])
     population->set_flags(flag);
     buffer_ptr->set_flags(flag);
 
-    for (int i=0; i<GA_MAXITER; i++){
+    //******************************************************************************* */
+    int mutation_rate_flag_;
+    std::cout << "Enter mutation rate flag number: " << endl;
+    std::cout << "1. basic" << endl;
+    std::cout << "2. Non-Unform" << endl;
+    std::cout << "3. Adaptive" << endl;
+    std::cout << "4. Triggered Hyper" << endl;
+    std::cout << "5. Self-Adaptive" << endl << endl;    
+    std::cin >> mutation_rate_flag_;
+
+    std::cout << "flag is " << mutation_rate_flag_ << endl; 
+    //******************************************************************************* */
+    
+    for (int i=0; i<  GA_MAXITER; i++){
         population->sort_by_fitness();
         if(flag.linear_scaling_F)population->liniar_scaling();
         
         std::cout << "Generation: " << i+1 << " Fitness: " << population->get_best().get_fitness() << std::endl;
         population->get_best().print_board();
+        population->set_generation_number(i+1);
 
         top_average_and_variance(*population, average_gene_distance, variance);
-
-        different_alleles.push_back(population->calc__number_of_different_alleles());
+        
+        //different_alleles.push_back(population->calc__number_of_different_alleles());
         //distance.push_back(population->calc_average_gene_distance());
-
-        best_fitness_vec.push_back(population->get_best().get_fitness());
+        //best_fitness_vec.push_back(population->get_best().get_fitness());
         //cout << "Average gene distance: " << population->calc_average_gene_distance() << endl;
-        cout << "Number of different alleles: " << population->calc__number_of_different_alleles() << endl;
+        //cout << "Number of different alleles: " << population->calc__number_of_different_alleles() << endl;
+        
+        curr_best_fitness = population->get_best().get_fitness();
+
+            
+        if(prev_best_fitness == curr_best_fitness){
+            global_counter = global_counter + 1;
+        }
+        
+        else{
+            global_counter = 0;
+        }
+
+
         if (population->get_best().get_fitness() == 0){
             break;
         }
+        mutation_rate_flag = mutation_rate_flag_;
+        
+        alils_number = population->calc__number_of_different_alleles();
+        SF_GLOB = population->calc_SF();
+
         //mate(*population, *buffer_ptr);
         non_deternistic_crowding(*population, *buffer_ptr, population->get_best());
+
+        preset_data.push_back(population->get_best().get_fitness());
+        
+        prev_best_fitness = curr_best_fitness;   
 
         swap(population, buffer_ptr);
         
                 
     }
 
-
-    write_numbers_to_file("average_gene_distance_sudoku.txt", average_gene_distance);
-    write_numbers_to_file("variance_sudoku.txt", variance);
-    write_numbers_to_file("different_alleles_sudoku.txt", different_alleles);
-    write_numbers_to_file("distance_sudoku.txt", distance);
-    write_numbers_to_file("best_fitness_sudoku.txt", best_fitness_vec);
+    //write_numbers_to_file("average_gene_distance_sudoku.txt", average_gene_distance);
+    //write_numbers_to_file("variance_sudoku.txt", variance);
+    //write_numbers_to_file("different_alleles_sudoku.txt", different_alleles);
+    //write_numbers_to_file("distance_sudoku.txt", distance);
+    //write_numbers_to_file("best_fitness_sudoku.txt", best_fitness_vec);
+    write_numbers_to_file("Non_Unform_mutation.txt", preset_data);
 
 
     return 0;
 }
-
-

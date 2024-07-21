@@ -23,6 +23,14 @@
 #include <QApplication>*/
 
 
+static int mutation_rate_flag_bin;
+static int generation_number_bin;
+static int alils_number_bin;
+static int global_counter_bin=0;
+static int prev_best_fitness_bin = 1000000;
+static int curr_best_fitness_bin = 1000000;  
+static double SF_GLOB_bin; 
+
 
 #define BIN_MAX_CAPACITY 100
 
@@ -236,7 +244,8 @@ void bins::init_bins(std::vector<int> items, flags flag){
     else if(i >= 75 || i < 100)
         this->worst_fit_init(items);
     else if(i == 100){
-           
+        
+        std::cout << "in sort!!!!" << std::endl;
         int j = dist(g) % 2;
         if(j == 0)
             std::sort(items.begin(), items.end());
@@ -508,6 +517,12 @@ class bin_vec
         double calc_fitness_variance(double mean);
         std::vector<bins> get_vec() const;
         bins get_best() const;
+
+        double calc_relative_fitness(const bins& individual);
+        double set_mutation_probability_individual(bins& individual);
+        double calc_SF();
+
+
         bins mate(int parent1, int parent2);
         void set(int i, bins b);
         bins get(int i) const;
@@ -531,6 +546,12 @@ class bin_vec
         int distance_between_two_bins(bins b1, bins b2);
         std::vector<std::vector<int>> distance_matrix();
         std::vector<std::vector<double>> shared_distance_matrix(std::vector<std::vector<int>> &distance_matrix, double sigma_share);
+        std::vector<double> f_share_fitnesses(std::vector<std::vector<double>> &shared_distance_matrix);
+
+        int parent_selection_RWS(std::vector<double> fitnesses);
+
+        void Niche(bin_vec &buffer, double sigma_share);
+
 
 };
 
@@ -624,7 +645,57 @@ bins bin_vec::get_best() const
 {
     return pop[0];
 }
+/******************************************************** */
 
+
+/// the relative fitness calculation
+double bin_vec::calc_relative_fitness(const bins& individual) {
+    int fitness_sum = calc_fitness_sum();
+    int count = pop.size();
+    
+    double mean = static_cast<double>(fitness_sum) / count;
+    double Rf = static_cast<double>(individual.get_fitness()) / mean;
+    
+    /// normalize
+    
+    double SF = 0;
+    
+    SF = SF_GLOB_bin;
+
+    double norm_Rf = Rf / SF;
+    
+    return norm_Rf;
+
+}
+
+double bin_vec::calc_SF(){
+    int fitness_sum = calc_fitness_sum();
+    int count = pop.size();
+    double mean = static_cast<double>(fitness_sum) / count;
+    double SF = 0;
+    for(bins itm: pop){
+        SF = SF + (itm.get_fitness()/ mean);
+    } 
+    return SF;
+}
+
+
+/// based on the relative fitness we are setting the mutation probability value 
+double bin_vec::set_mutation_probability_individual(bins& individual) {
+    
+    double max_mutation_probability = GA_MUTATIONRATE;
+    double relative_fitness = calc_relative_fitness(individual);
+    
+    double individual_mutation_probability = max_mutation_probability * (1.0 - relative_fitness);
+    
+    
+    return individual_mutation_probability;
+
+}
+
+
+
+/**************************************************** */
 bins bin_vec::mate(int parent1, int parent2)
 {
     
@@ -659,7 +730,54 @@ bins bin_vec::mate(int parent1, int parent2)
 
     child.init_bins(items, flag);
 
-    if(flag.mutation_F){
+    double mutation_rate;
+    
+    if(mutation_rate_flag_bin == 1){
+        mutation_rate = GA_MUTATIONRATE;
+    }
+    else if(mutation_rate_flag_bin == 2){
+        mutation_rate = Non_Unform_Mutation(generation_number_bin);
+    }
+    else if(mutation_rate_flag_bin == 3){
+        
+        int alleles = alils_number_bin;
+        
+        int threshold_smaller = 500;
+        int threshold_biger = 700;
+        
+        mutation_rate = GA_MUTATIONRATE;
+
+        if(alleles < threshold_smaller){
+            mutation_rate = 0.8;
+        }
+        else if(alleles > threshold_biger){
+            mutation_rate = 0.2;
+
+        }
+    }
+    else if(mutation_rate_flag_bin == 4){
+        mutation_rate = GA_MUTATIONRATE;
+
+        if(global_counter_bin >= 5){
+
+            mutation_rate = 0.9f;
+            
+
+            if((global_counter_bin > 25)){
+                
+                mutation_rate = GA_MUTATIONRATE;
+                global_counter_bin = 0;
+            }
+        }
+
+    }
+    else if(mutation_rate_flag_bin == 5){
+        double prob_mutation = set_mutation_probability_individual(child);
+
+        mutation_rate = prob_mutation;
+    }
+
+    if(flag.mutation_F && (mutation_rate*RAND_MAX < rand())){
         std::random_device rd;
         std::mt19937 g(rd());
         std::uniform_int_distribution<> dist(1, 100);
@@ -672,7 +790,7 @@ bins bin_vec::mate(int parent1, int parent2)
             child.repair_vector(items);
         }
     }
-        
+
     return child;
 }
 
@@ -841,6 +959,7 @@ int bin_vec::distance_between_two_bins(bins b1, bins b2){
             }
             // Swap the items
             items2[index] = temp;
+            
             distance++;
         }
     }
@@ -872,7 +991,102 @@ std::vector<std::vector<double>> bin_vec::shared_distance_matrix(std::vector<std
     return shared_distance_matrix;
 }
 
+std::vector<double> bin_vec::f_share_fitnesses(std::vector<std::vector<double>> &shared_distance_matrix){
+    std::vector<double> f_share_fitnesses;
 
+    for(int i = 0; i < pop.size(); i++){
+        double f_share = 0;
+        for(int j = 0; j < pop.size(); j++){
+            f_share += shared_distance_matrix[i][j];
+        }
+        double raw_fit = pop[i].get_fitness();
+        f_share_fitnesses.push_back(raw_fit / f_share);
+    }
+    return f_share_fitnesses;
+}
+
+int bin_vec::parent_selection_RWS(std::vector<double> fitnesses){
+    double max =  *std::max_element(fitnesses.begin(), fitnesses.end());
+    max++; // Avoiding fitness = 0
+    double total_fitness = 0;
+    for (const auto &element : fitnesses) {
+        total_fitness += max-element;
+    }
+    // random number between 0 and total_fitness
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dis(0, total_fitness);
+    double r1 = dis(gen);
+
+    double sum = 0;
+    int index = 0;
+    for (int i = 0; i < GA_POPSIZE; i++) {
+        sum += max-fitnesses[i];
+        if (sum >= r1) {
+            return i;
+            index = i;
+        }
+    }
+    return index;
+}
+
+void bin_vec::Niche(bin_vec &buffer, double sigma_share){
+    std::vector<std::vector<int>> distance_matrix = this->distance_matrix();
+    std::vector<std::vector<double>> shared_distance_matrix = this->shared_distance_matrix(distance_matrix, sigma_share);
+    std::vector<double> f_share_fitnesses = this->f_share_fitnesses(shared_distance_matrix);
+    std::vector<int> indexes;
+    
+    int counter = 0;
+    for (int i = 0; i < pop.size(); i++){
+        indexes.push_back(i);
+    }
+    
+    for (int i = 0; i < f_share_fitnesses.size(); i++){
+        std::cout << f_share_fitnesses[i] << " ";
+    }
+  
+
+    for(int i = 0; i < buffer.get_vec().size(); i++){
+        int index = parent_selection_RWS(f_share_fitnesses);
+        std::cout << "index: " << index << std::endl;
+
+        std::shuffle(indexes.begin(), indexes.end(), std::mt19937(std::random_device()()));
+        for (int j = 0; j < indexes.size(); j++){
+            if (indexes[j] != index){
+                if (distance_matrix[index][indexes[j]] < sigma_share){
+                    std::cout << "indexes[j]: " << indexes[j] << std::endl;
+                    bins child = mate(index, indexes[j]);
+                    buffer.set(i, child);
+                    shared_distance_matrix[index][indexes[j]] += 1 - (distance_matrix[index][indexes[j]] / sigma_share);
+                    
+                    shared_distance_matrix[indexes[j]][index] = shared_distance_matrix[index][indexes[j]];
+                    
+                    f_share_fitnesses[index] = pop[index].get_fitness() / shared_distance_matrix[index][indexes[j]];
+                    break;
+                }
+                else if (j == pop.size()-1){
+                    i--;
+                    counter++;
+                    if (counter > 1000){
+                        std::cout << "Error: Niche algorithm is stuck in a loop" << std::endl;
+                        sigma_share++;
+                        counter = 0;
+                        if (sigma_share < 0){
+                            std::cout << "Error: sigma_share is negative" << std::endl;
+                            exit(1);
+                        }
+                    }
+                
+                }
+                else{
+                    cout<<"Error: 111111111111111111111111111"<<endl;
+                }
+            }
+
+        }
+
+    }
+}
 
 ///********************************************************************************************************************************************************************
 
@@ -1092,6 +1306,22 @@ int main (int argc, char* argv[])
     bin_vec *buffer_ptr = &buffer;
     population->flag = flag;
     buffer_ptr->flag = flag;
+
+    ///****************************************************************** */
+    int mutation_rate_flag_;
+    std::cout << "Enter mutation rate flag number: " << endl;
+    std::cout << "1. basic" << endl;
+    std::cout << "2. Non-Unform" << endl;
+    std::cout << "3. Adaptive" << endl;
+    std::cout << "4. Triggered Hyper" << endl;
+    std::cout << "5. Self-Adaptive" << endl << endl;    
+    std::cin >> mutation_rate_flag_;
+
+    std::cout << "flag is " << mutation_rate_flag_ << endl;
+    
+    mutation_rate_flag_bin = mutation_rate_flag_;
+
+    ///****************************************************************** */
     
     std::vector<int> numbers;
 
@@ -1099,7 +1329,13 @@ int main (int argc, char* argv[])
     for (int i=0; i<GA_MAXITER; i++){
 
         population->sort_by_fitness();
-        
+
+        /****** */
+        generation_number_bin = i + 1;
+        alils_number_bin = population->calc_number_of_different_alleles();
+        SF_GLOB_bin = population->calc_SF();
+        /****** */
+
         std::cout << "Generation: " << i+1 << " Fitness: " << population->get_best().get_fitness() << std::endl;
         
         int lell = population->calc_number_of_different_alleles();
@@ -1110,12 +1346,27 @@ int main (int argc, char* argv[])
 
         top_average_and_variance(*population, average, variance);
         
+        /******** */
+        curr_best_fitness_bin = population->get_best().get_fitness();  
+        if(prev_best_fitness_bin == curr_best_fitness_bin){
+            global_counter_bin = global_counter_bin + 1;
+        }else{
+            global_counter_bin = 0;
+        }
+        /******* */
+
         fitness_vec.push_back(population->get_best().get_fitness());
         if (population->get_best().get_fitness()==0){
             break;
         }
 
-        mate(*population, *buffer_ptr);
+        //mate(*population, *buffer_ptr);
+
+        population->Niche(*buffer_ptr, 100);
+        
+        /****** */
+        prev_best_fitness_bin = curr_best_fitness_bin;   
+        /****** */
        
         swap(population, buffer_ptr);      
     }

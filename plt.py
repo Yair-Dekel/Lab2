@@ -23,7 +23,7 @@ if __name__ == "__main__":
     file_path = 'incorrect.txt'  # path to your file
     numbers = read_numbers_from_file(file_path)
     plot_numbers(numbers, file_path)
-    '''file_path = 'variance_BINS.txt'  # path to your file
+    file_path = 'variance_BINS.txt'  # path to your file
     numbers = read_numbers_from_file(file_path)
     plot_numbers(numbers, file_path)
     file_path = 'average_BINS.txt'  # path to your file
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     plot_numbers(numbers, file_path)
     file_path = 'fitness_BINS.txt'  # path to your file
     numbers = read_numbers_from_file(file_path)
-    plot_numbers(numbers, file_path) '''   
+    plot_numbers(numbers, file_path)    
 
     
 

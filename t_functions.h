@@ -1,9 +1,10 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <cmath>
 
-#define GA_MAXITER		 500			// maximum iterations
-#define GA_POPSIZE		 1000		    // ga population size
+#define GA_MAXITER		 50			// maximum iterations
+#define GA_POPSIZE		 100		    // ga population size
 #define GA_ELITRATE		 0.05f		    // elitism rate
 #define GA_ELITRATE		 0.05f		    // elitism rate
 #define GA_MUTATIONRATE	 0.4f		    // mutation rate
@@ -11,6 +12,15 @@
 #define GA_TARGET		 std::string("Hello world!")
 #define MAX_AGE          3
 #define REPRODUCE_THRESH 1
+
+
+double Non_Unform_Mutation(int generation) {
+    double r = -0.01;
+    double Pmax = GA_MUTATIONRATE;
+    return (2 * Pmax * exp(r * generation)) / (Pmax + Pmax * exp(r * generation));
+    
+}
+
 
 
 template <typename T>
