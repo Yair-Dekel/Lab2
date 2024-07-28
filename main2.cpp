@@ -235,17 +235,21 @@ void bins::init_bins(std::vector<int> items, flags flag){
 
     //std::cout << "i: " << i << std::endl;
 
-    if (i > 0 || i < 25)
-        this->random_init(items);
-    else if(i >= 25 || i < 50)
-        this->greedy_init(items);
-    else if(i >= 50 || i < 75)
-        this->best_fit_init(items);
-    else if(i >= 75 || i < 100)
-        this->worst_fit_init(items);
+    if (i > 0 && i < 25){
+        //std::cout << "in random!!!!" << std::endl;
+        this->random_init(items);}
+    else if(i >= 25 && i < 50){
+        //std::cout << "in greedy!!!!" << std::endl;
+        this->greedy_init(items);}
+    else if(i >= 50 && i < 75){
+        //std::cout << "in best_fit!!!!" << std::endl;
+        this->best_fit_init(items);}
+    else if(i >= 75 && i < 100){
+        //std::cout << "in worst_fit!!!!" << std::endl;
+        this->worst_fit_init(items);}
     else if(i == 100){
         
-        std::cout << "in sort!!!!" << std::endl;
+        std::cout << "in sort!!!!";
         int j = dist(g) % 2;
         if(j == 0)
             std::sort(items.begin(), items.end());
@@ -289,6 +293,7 @@ void bins::greedy_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
+    std::cout << "in greedy - Fitness: " << fitness << std::endl;
 }
 
 void bins::random_init(std::vector<int> items){
@@ -315,6 +320,7 @@ void bins::random_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
+    std::cout << "in random - Fitness: " << fitness << std::endl;
 }
 
 void bins::best_fit_init(std::vector<int> items){
@@ -323,8 +329,9 @@ void bins::best_fit_init(std::vector<int> items){
     bins_vec.push_back(b);
     for (int i = 0; i < items.size(); i++){
         int best_fit_indx = 0;
+        // Find the bin with the less remaining capacity
         for(int j = 0; j < bins_vec.size(); j++){
-            if(bins_vec[j].remain_capacity < bins_vec[best_fit_indx].remain_capacity){
+            if(bins_vec[j].remain_capacity < bins_vec[best_fit_indx].remain_capacity && bins_vec[j].remain_capacity >= items[i]){
                 best_fit_indx = j;
             }
         }
@@ -341,6 +348,7 @@ void bins::best_fit_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
+    std::cout << "in best fit - Fitness: " << fitness << std::endl;
 
 }
 
@@ -368,6 +376,7 @@ void bins::worst_fit_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
+    std::cout << "in worst fit - Fitness: " << fitness << std::endl;
 }               
 
 void bins::print_bins() const{
@@ -1048,13 +1057,13 @@ void bin_vec::Niche(bin_vec &buffer, double sigma_share){
 
     for(int i = 0; i < buffer.get_vec().size(); i++){
         int index = parent_selection_RWS(f_share_fitnesses);
-        std::cout << "index: " << index << std::endl;
+        //std::cout << "index: " << index << std::endl;
 
         std::shuffle(indexes.begin(), indexes.end(), std::mt19937(std::random_device()()));
         for (int j = 0; j < indexes.size(); j++){
             if (indexes[j] != index){
                 if (distance_matrix[index][indexes[j]] < sigma_share){
-                    std::cout << "indexes[j]: " << indexes[j] << std::endl;
+                    //std::cout << "indexes[j]: " << indexes[j] << std::endl;
                     bins child = mate(index, indexes[j]);
                     buffer.set(i, child);
                     shared_distance_matrix[index][indexes[j]] += 1 - (distance_matrix[index][indexes[j]] / sigma_share);
@@ -1069,7 +1078,7 @@ void bin_vec::Niche(bin_vec &buffer, double sigma_share){
                     counter++;
                     if (counter > 1000){
                         std::cout << "Error: Niche algorithm is stuck in a loop" << std::endl;
-                        sigma_share++;
+                        sigma_share+=10;
                         counter = 0;
                         if (sigma_share < 0){
                             std::cout << "Error: sigma_share is negative" << std::endl;
@@ -1079,7 +1088,7 @@ void bin_vec::Niche(bin_vec &buffer, double sigma_share){
                 
                 }
                 else{
-                    cout<<"Error: 111111111111111111111111111"<<endl;
+                    //std::cout<<"Error: 111111111111111111111111111"<<endl;
                 }
             }
 
@@ -1362,7 +1371,7 @@ int main (int argc, char* argv[])
 
         //mate(*population, *buffer_ptr);
 
-        population->Niche(*buffer_ptr, 100);
+        population->Niche(*buffer_ptr, 400);
         
         /****** */
         prev_best_fitness_bin = curr_best_fitness_bin;   
