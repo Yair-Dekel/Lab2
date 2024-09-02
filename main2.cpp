@@ -13,6 +13,10 @@
 #include <set>
 #include <fstream>
 #include <sstream>
+#include <limits> 
+#include <cmath>  
+#include <map>
+
 
 
 #include "t_functions.h"
@@ -398,7 +402,7 @@ void bins::calc_fitness(){
         for (int j = 0; j < bins_vec[i].items.size(); j++){
             sum += bins_vec[i].items[j];
         }
-        if (sum < max_capacity) fitness ++;
+        if (sum < max_capacity) fitness++;
             
         fitness += abs(sum - max_capacity);
     }
@@ -531,7 +535,6 @@ class bin_vec
         double set_mutation_probability_individual(bins& individual);
         double calc_SF();
 
-
         bins mate(int parent1, int parent2);
         void set(int i, bins b);
         bins get(int i) const;
@@ -561,6 +564,11 @@ class bin_vec
 
         void Niche(bin_vec &buffer, double sigma_share);
 
+        double k_means_clustering(int k);
+        double k_means_clustering(int k, const std::vector<std::vector<int>>& dist_matrix);
+        std::vector<std::vector<int>> k_means_clustering2(int k, const std::vector<std::vector<int>>& dist_matrix);
+        int find_best_k(int max_k);
+        int find_best_k2(int max_k, bin_vec &buffer);
 
 };
 
@@ -654,6 +662,7 @@ bins bin_vec::get_best() const
 {
     return pop[0];
 }
+
 /******************************************************** */
 
 
@@ -933,7 +942,6 @@ void bin_vec::liniar_scaling(){
     }
 }
 
-
 int bin_vec::calc_number_of_different_alleles(){
     
     std::set<std::set<std::set<int>>> alleles;
@@ -1096,6 +1104,264 @@ void bin_vec::Niche(bin_vec &buffer, double sigma_share){
 
     }
 }
+
+// The k-means clustering method
+double bin_vec::k_means_clustering(int k) {
+    // Step 1: Initialize centroids randomly from the population
+    std::vector<bins> centroids;
+    std::sample(pop.begin(), pop.end(), std::back_inserter(centroids), k, std::mt19937{std::random_device{}()});
+
+    std::vector<int> assignments(pop.size(), -1);  // Cluster assignments for each bin
+    bool changed;
+    double total_distance = 0.0;
+
+    do {
+        changed = false;
+        total_distance = 0.0;
+
+        // Step 2: Assign each bin to the nearest centroid
+        for (size_t i = 0; i < pop.size(); ++i) {
+            int nearest_centroid = 0;
+            int min_distance = distance_between_two_bins(pop[i], centroids[0]);
+
+            for (int j = 1; j < k; ++j) {
+                int distance = distance_between_two_bins(pop[i], centroids[j]);
+                if (distance < min_distance) {
+                    min_distance = distance;
+                    nearest_centroid = j;
+                }
+            }
+
+            // Accumulate the distance for total distance calculation
+            total_distance += min_distance;
+
+            // If the assignment changes, mark that a change occurred
+            if (assignments[i] != nearest_centroid) {
+                assignments[i] = nearest_centroid;
+                changed = true;
+            }
+        }
+
+        // Step 3: Recalculate centroids
+        if (changed) {
+            std::vector<std::vector<int>> clusters(k);
+            for (size_t i = 0; i < pop.size(); ++i) {
+                clusters[assignments[i]].push_back(i);
+            }
+
+            for (int j = 0; j < k; ++j) {
+                if (!clusters[j].empty()) {
+                    // Randomly select a new centroid from the cluster members
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    std::uniform_int_distribution<> dist(0, clusters[j].size() - 1);
+                    centroids[j] = pop[clusters[j][dist(gen)]];
+                }
+            }
+        }
+    } while (changed);
+
+    // Output the minimum total distance after clustering
+    std::cout << "Minimum total distance: " << total_distance << std::endl;
+
+    return total_distance;
+
+    // At this point, assignments represent the cluster each bin belongs to
+    // You can further process these clusters as needed
+}
+
+
+double bin_vec::k_means_clustering(int k, const std::vector<std::vector<int>>& dist_matrix) {
+    std::vector<bins> centroids;
+    std::sample(pop.begin(), pop.end(), std::back_inserter(centroids), k, std::mt19937{std::random_device{}()});
+
+    std::vector<int> assignments(pop.size(), -1);
+    bool changed;
+    double total_distance = 0.0;
+
+    do {
+        changed = false;
+        total_distance = 0.0;
+
+        // Step 2: Assign each bin to the nearest centroid
+        for (size_t i = 0; i < pop.size(); ++i) {
+            int nearest_centroid = 0;
+            int min_distance = dist_matrix[i][0];
+
+            for (int j = 1; j < k; ++j) {
+                int distance = dist_matrix[i][j];
+                if (distance < min_distance) {
+                    min_distance = distance;
+                    nearest_centroid = j;
+                }
+            }
+
+            total_distance += min_distance;
+
+            if (assignments[i] != nearest_centroid) {
+                assignments[i] = nearest_centroid;
+                changed = true;
+            }
+        }
+
+        // Step 3: Recalculate centroids
+        if (changed) {
+            std::vector<std::vector<int>> clusters(k);
+            for (size_t i = 0; i < pop.size(); ++i) {
+                clusters[assignments[i]].push_back(i);
+            }
+
+            for (int j = 0; j < k; ++j) {
+                if (!clusters[j].empty()) {
+                    // Choose a random bin as the new centroid
+                    std::uniform_int_distribution<int> distribution(0, clusters[j].size() - 1);
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    int random_index = distribution(gen);
+                    centroids[j] = pop[clusters[j][random_index]];
+                }
+            }
+        }
+    } while (changed);
+
+    return total_distance;
+}
+
+std::vector<std::vector<int>> bin_vec::k_means_clustering2(int k, const std::vector<std::vector<int>>& dist_matrix) {
+    std::vector<bins> centroids;
+    std::sample(pop.begin(), pop.end(), std::back_inserter(centroids), k, std::mt19937{std::random_device{}()});
+
+    std::vector<int> assignments(pop.size(), -1);
+    bool changed;
+    double total_distance = 0.0;
+    std::vector<std::vector<int>> final_clusters(k);
+
+
+    do {
+        changed = false;
+        total_distance = 0.0;
+
+        // Step 2: Assign each bin to the nearest centroid
+        for (size_t i = 0; i < pop.size(); ++i) {
+            int nearest_centroid = 0;
+            int min_distance = dist_matrix[i][0];
+
+            for (int j = 1; j < k; ++j) {
+                int distance = dist_matrix[i][j];
+                if (distance < min_distance) {
+                    min_distance = distance;
+                    nearest_centroid = j;
+                }
+            }
+
+            total_distance += min_distance;
+
+            if (assignments[i] != nearest_centroid) {
+                assignments[i] = nearest_centroid;
+                changed = true;
+            }
+        }
+
+        // Step 3: Recalculate centroids
+        if (changed) {
+            std::vector<std::vector<int>> clusters(k);
+            for (size_t i = 0; i < final_clusters.size(); ++i) {
+                final_clusters[i].clear();
+            }
+            for (size_t i = 0; i < pop.size(); ++i) {
+                clusters[assignments[i]].push_back(i);
+                final_clusters[assignments[i]].push_back(i);
+            }
+
+            for (int j = 0; j < k; ++j) {
+                if (!clusters[j].empty()) {
+                    // Choose a random bin as the new centroid
+                    std::uniform_int_distribution<int> distribution(0, clusters[j].size() - 1);
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    int random_index = distribution(gen);
+                    centroids[j] = pop[clusters[j][random_index]];
+                }
+            }
+        }
+    } while (changed);
+
+    return final_clusters;
+}
+
+int bin_vec::find_best_k(int max_k) {
+    std::vector<double> distances;
+
+    for (int k = 2; k <= max_k; ++k) {
+        double total_distance = k_means_clustering(k);
+        distances.push_back(total_distance);
+        std::cout << "k = " << k << ", Total Distance = " << total_distance << std::endl;
+    }
+
+    // Find the "elbow" point
+    double best_k = 2;
+    double min_difference = std::numeric_limits<double>::max();
+
+    for (int i = 2; i < distances.size() - 1; ++i) {
+        double diff1 = distances[i] - distances[i - 1];
+        double diff2 = distances[i + 1] - distances[i];
+        if (diff1 > diff2 && diff1 < min_difference) {
+            min_difference = diff1;
+            best_k = i + 1;
+        }
+    }
+
+    std::cout << "Best k based on elbow method: " << best_k << std::endl;
+    return best_k;
+}
+
+
+int bin_vec::find_best_k2(int max_k, bin_vec &buffer) {
+    std::map<int, double> k_to_distance;
+    auto dist_matrix = distance_matrix();  // Precompute distance matrix
+
+    for (int k = 2; k <= max_k; ++k) {
+        double distance = k_means_clustering(k, dist_matrix);
+        k_to_distance[k] = distance;
+        std::cout << "k = " << k << ", Total Distance = " << distance << std::endl;
+    }
+
+    // Determine the "elbow" point
+    int best_k = 2;
+    double max_diff = 0.0;
+
+    for (int k = 3; k <= max_k; ++k) {
+        double diff1 = k_to_distance[k - 1] - k_to_distance[k];
+        double diff2 = k_to_distance[k] - k_to_distance[k - 2];
+        if (diff1 > diff2 && diff1 > max_diff) {
+            max_diff = diff1;
+            best_k = k;
+        }
+    }
+
+    std::cout << "Best k based on elbow method: " << best_k << std::endl;
+
+    std::vector<std::vector<int>> clusters = k_means_clustering2(best_k, dist_matrix);
+    
+    int esize = pop.size()*GA_ELITRATE;
+    elitism(*this, buffer, esize);
+
+    for (int i = esize; i < pop.size(); i++){
+        int random_individual = rand() % pop.size();
+        int cluster_index = 0;
+        for (int j = 0; j < clusters.size(); j++){
+            if (std::find(clusters[j].begin(), clusters[j].end(), random_individual) != clusters[j].end()){
+                cluster_index = j;
+                break;
+            }
+        }
+        bins child = mate(clusters[cluster_index][rand() % clusters[cluster_index].size()], random_individual);
+        buffer.set(i, child);
+    }
+
+    return best_k;
+}
+
 
 ///********************************************************************************************************************************************************************
 
@@ -1371,7 +1637,9 @@ int main (int argc, char* argv[])
 
         //mate(*population, *buffer_ptr);
 
-        population->Niche(*buffer_ptr, 400);
+        //population->Niche(*buffer_ptr, 400);
+
+        int best_k = population->find_best_k2(30, *buffer_ptr);
         
         /****** */
         prev_best_fitness_bin = curr_best_fitness_bin;   
