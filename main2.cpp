@@ -253,7 +253,7 @@ void bins::init_bins(std::vector<int> items, flags flag){
         this->worst_fit_init(items);}
     else if(i == 100){
         
-        std::cout << "in sort!!!!";
+        //std::cout << "in sort!!!!";
         int j = dist(g) % 2;
         if(j == 0)
             std::sort(items.begin(), items.end());
@@ -297,7 +297,7 @@ void bins::greedy_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
-    std::cout << "in greedy - Fitness: " << fitness << std::endl;
+    //std::cout << "in greedy - Fitness: " << fitness << std::endl;
 }
 
 void bins::random_init(std::vector<int> items){
@@ -324,7 +324,7 @@ void bins::random_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
-    std::cout << "in random - Fitness: " << fitness << std::endl;
+    //std::cout << "in random - Fitness: " << fitness << std::endl;
 }
 
 void bins::best_fit_init(std::vector<int> items){
@@ -352,7 +352,7 @@ void bins::best_fit_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
-    std::cout << "in best fit - Fitness: " << fitness << std::endl;
+    //std::cout << "in best fit - Fitness: " << fitness << std::endl;
 
 }
 
@@ -380,7 +380,7 @@ void bins::worst_fit_init(std::vector<int> items){
     }
     num_items = items.size();
     this->calc_fitness();
-    std::cout << "in worst fit - Fitness: " << fitness << std::endl;
+    //std::cout << "in worst fit - Fitness: " << fitness << std::endl;
 }               
 
 void bins::print_bins() const{
@@ -569,6 +569,8 @@ class bin_vec
         std::vector<std::vector<int>> k_means_clustering2(int k, const std::vector<std::vector<int>>& dist_matrix);
         int find_best_k(int max_k);
         int find_best_k2(int max_k, bin_vec &buffer);
+
+        void non_deterministic_crowding(bin_vec &buffer, double sigma_share);
 
 };
 
@@ -877,6 +879,7 @@ void bin_vec::parent_selection_SUS(vector<int> &parents, int parents_num) {
 void bin_vec::parent_selection_RWS(int &i1) {
 	    
     int tsize = 9;
+
 	int max =  linear_scaled_fitnesses[GA_POPSIZE-1];
 	max++; // Avoiding fitness = 0
 	int total_fitness = 0;
@@ -1323,7 +1326,7 @@ int bin_vec::find_best_k2(int max_k, bin_vec &buffer) {
     for (int k = 2; k <= max_k; ++k) {
         double distance = k_means_clustering(k, dist_matrix);
         k_to_distance[k] = distance;
-        std::cout << "k = " << k << ", Total Distance = " << distance << std::endl;
+        //std::cout << "k = " << k << ", Total Distance = " << distance << std::endl;
     }
 
     // Determine the "elbow" point
@@ -1360,6 +1363,50 @@ int bin_vec::find_best_k2(int max_k, bin_vec &buffer) {
     }
 
     return best_k;
+}
+
+void bin_vec::non_deterministic_crowding(bin_vec &buffer, double T){
+
+    int e_size = pop.size()*GA_ELITRATE;
+    elitism(*this, buffer, e_size);
+    
+    for(int i = e_size; i < buffer.get_vec().size(); i++){
+        int index = 0;
+        liniar_scaling();
+        parent_selection_RWS(index);
+
+        bins child1 = mate(index, i);
+
+        bins child2 = mate(i, index);
+        
+        double parent1_fitness = pop[index].get_fitness();
+        double parent2_fitness = pop[i].get_fitness();
+        double child1_fitness = child1.get_fitness();
+        double child2_fitness = child2.get_fitness();
+        if (child1_fitness > parent1_fitness) {
+            double P_replace = exp((child1_fitness - parent1_fitness) / T);
+            if ((rand() / double(RAND_MAX)) < P_replace) {
+                buffer.set(i, child1);
+            }
+            else {
+                buffer.set(i, pop[i]);
+            }
+        } else if(child2_fitness > parent2_fitness) {
+            double P_replace = exp((child2_fitness - parent2_fitness) / T);
+            if ((rand() / double(RAND_MAX)) < P_replace) {
+                buffer.set(i, child2);
+            }
+            else {
+                buffer.set(i, pop[index]);
+            }
+            buffer.set(i, pop[index]);
+        }
+        else{
+            buffer.set(i, pop[i]);
+        }       
+        
+
+    }
 }
 
 
@@ -1508,6 +1555,22 @@ int main (int argc, char* argv[])
         else if (strcmp(argv[i], "-nrand_crossover") == 0){
             flag.rand_crossover_F = false;
         }
+        else if (strcmp(argv[i], "-niche") == 0){
+            flag.niching_F = true;
+        }
+        else if (strcmp(argv[i], "-crowding") == 0){
+            flag.crowding_F = true;
+            flag.niching_F = false;
+        }
+        else if (strcmp(argv[i], "-clustering") == 0){
+            flag.clustering_F = true;
+            flag.niching_F = false;
+        }
+        else if (strcmp(argv[i], "-nniche") == 0){
+            flag.niching_F = false;
+            flag.simple_mate_F = true;
+        }
+
 
         else{
             std::cout << "Invalid flag" << std::endl;
@@ -1635,16 +1698,17 @@ int main (int argc, char* argv[])
             break;
         }
 
-        //mate(*population, *buffer_ptr);
+        if (flag.simple_mate_F) mate(*population, *buffer_ptr);
 
-        //population->Niche(*buffer_ptr, 400);
+        if (flag.niching_F) population->Niche(*buffer_ptr, 400);
 
-        int best_k = population->find_best_k2(30, *buffer_ptr);
+        if (flag.clustering_F) int best_k = population->find_best_k2(30, *buffer_ptr);
         
+        if (flag.crowding_F) population->non_deterministic_crowding(*buffer_ptr, 0.1);
+
         /****** */
         prev_best_fitness_bin = curr_best_fitness_bin;   
-        /****** */
-       
+        /****** */       
         swap(population, buffer_ptr);      
     }
 

@@ -193,6 +193,8 @@ class flags
     bool best_fit_F, worst_fit_F, random_F, greedy_F, shuffle_F, fit_F;
     bool single_point_F, two_point_F, uniform_F, rand_crossover_F;
 
+    bool niching_F, crowding_F, clustering_F, simple_mate_F;
+
     bool learning_F;
     flags();
     flags(const flags &f);
@@ -227,6 +229,11 @@ flags::flags()
     two_point_F = false;
     uniform_F = false;
     rand_crossover_F = true;
+    
+    niching_F = true;
+    clustering_F = false;
+    crowding_F = false;
+    simple_mate_F = false;
 
     learning_F = true;
 }
@@ -255,6 +262,11 @@ flags::flags(const flags &f)
     this->two_point_F = f.two_point_F;
     this->uniform_F = f.uniform_F;
     this->rand_crossover_F = f.rand_crossover_F;
+
+    this->niching_F = f.niching_F;
+    this->clustering_F = f.clustering_F;
+    this->crowding_F = f.crowding_F;
+    this->simple_mate_F = f.simple_mate_F;
 
     this->learning_F = f.learning_F;
 }
@@ -286,6 +298,11 @@ flags& flags::operator=(const flags &f)
     this->two_point_F = f.two_point_F;
     this->uniform_F = f.uniform_F;
     this->rand_crossover_F = f.rand_crossover_F;
+
+    this->niching_F = f.niching_F;
+    this->clustering_F = f.clustering_F;
+    this->crowding_F = f.crowding_F;
+    this->simple_mate_F = f.simple_mate_F;
 
     this->learning_F = f.learning_F;
     return *this;
