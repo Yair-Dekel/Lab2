@@ -563,6 +563,7 @@ class bin_vec
         int parent_selection_RWS(std::vector<double> fitnesses);
 
         void Niche(bin_vec &buffer, double sigma_share);
+        int count_niches(double sigma_share);
 
         double k_means_clustering(int k);
         double k_means_clustering(int k, const std::vector<std::vector<int>>& dist_matrix);
@@ -1050,7 +1051,7 @@ int bin_vec::parent_selection_RWS(std::vector<double> fitnesses){
     return index;
 }
 
-void bin_vec::Niche(bin_vec &buffer, double sigma_share){
+/*void bin_vec::Niche(bin_vec &buffer, double sigma_share){
     std::vector<std::vector<int>> distance_matrix = this->distance_matrix();
     std::vector<std::vector<double>> shared_distance_matrix = this->shared_distance_matrix(distance_matrix, sigma_share);
     std::vector<double> f_share_fitnesses = this->f_share_fitnesses(shared_distance_matrix);
@@ -1106,7 +1107,95 @@ void bin_vec::Niche(bin_vec &buffer, double sigma_share){
         }
 
     }
+}*/
+
+void bin_vec::Niche(bin_vec &buffer, double sigma_share) {
+
+    int e_size = pop.size()*GA_ELITRATE;
+    elitism(*this, buffer, e_size);
+    // Precompute the distance and shared distance matrices
+    std::vector<std::vector<int>> distance_matrix = this->distance_matrix();
+    std::vector<std::vector<double>> shared_distance_matrix = this->shared_distance_matrix(distance_matrix, sigma_share);
+    std::vector<double> f_share_fitnesses = this->f_share_fitnesses(shared_distance_matrix);
+
+    std::vector<int> indexes(pop.size());
+    std::iota(indexes.begin(), indexes.end(), 0); // Fill indexes with values 0 to pop.size()-1
+
+    int counter = 0;
+    for (int i = e_size; i < buffer.get_vec().size(); i++) {
+        int index = parent_selection_RWS(f_share_fitnesses);
+
+        std::shuffle(indexes.begin(), indexes.end(), std::mt19937(std::random_device()()));
+
+        bool mate_found = false;
+        for (int j = 0; j < indexes.size(); j++) {
+            if (indexes[j] != index) {
+                if (distance_matrix[index][indexes[j]] < sigma_share) {
+                    // Mate selected, produce offspring
+                    bins child = mate(index, indexes[j]);
+                    buffer.set(i, child);
+
+                    // Update shared distance matrix and fitness values
+                    double shared_value = 1 - (distance_matrix[index][indexes[j]] / sigma_share);
+                    shared_distance_matrix[index][indexes[j]] += shared_value;
+                    shared_distance_matrix[indexes[j]][index] = shared_distance_matrix[index][indexes[j]];
+
+                    // Recompute shared fitness for the selected index
+                    f_share_fitnesses[index] = pop[index].get_fitness() / shared_distance_matrix[index][indexes[j]];
+
+                    mate_found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!mate_found) {
+            // If no mate found within sigma_share, re-try or adjust sigma_share
+            i--;
+            counter++;
+            if (counter > 1000) {
+                std::cout << "Error: Niche algorithm is stuck in a loop" << std::endl;
+                sigma_share += 10; // Adjust sigma_share cautiously
+                counter = 0;
+            }
+        }
+    }
+    std::cout << "Sigma share: " << sigma_share << std::endl;
+    std::cout << "Niches: " << count_niches(sigma_share) << std::endl;
 }
+
+int bin_vec::count_niches(double sigma_share) {
+    std::vector<std::vector<int>> distance_matrix = this->distance_matrix();
+    std::vector<bool> visited(pop.size(), false);
+    int niche_count = 0;
+
+    // Iterate through each individual in the population
+    for (int i = 0; i < pop.size(); ++i) {
+        if (!visited[i]) {
+            niche_count++;
+            // Start a new niche
+            std::set<int> current_niche;
+            current_niche.insert(i);
+            visited[i] = true;
+
+            // Find all individuals within sigma_share distance and mark them as visited
+            for (int j = 0; j < pop.size(); ++j) {
+                if (!visited[j] && distance_matrix[i][j] < sigma_share) {
+                    current_niche.insert(j);
+                    visited[j] = true;
+                }
+            }
+            std::cout << "Niche " << niche_count << ": ";
+            for (int member : current_niche) {
+                std::cout << member << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    return niche_count;
+}
+
 
 // The k-means clustering method
 double bin_vec::k_means_clustering(int k) {
@@ -1483,6 +1572,7 @@ int main (int argc, char* argv[])
     flags flag;
     int i =1;
     int index = 5;
+    int niche_size = 100, num_clusters = 30;
 
     while (i < argc){
         if (strcmp(argv[i], "-RWS") == 0){
@@ -1570,7 +1660,16 @@ int main (int argc, char* argv[])
             flag.niching_F = false;
             flag.simple_mate_F = true;
         }
+        else if (strcmp(argv[i], "-niche_size") == 0){
+            niche_size = atoi(argv[i+1]);
+            i++;
+        }
+        else if (strcmp(argv[i], "-num_clusters") == 0){
+            num_clusters = atoi(argv[i+1]);
+            i++;
+        }
 
+    
 
         else{
             std::cout << "Invalid flag" << std::endl;
@@ -1700,9 +1799,9 @@ int main (int argc, char* argv[])
 
         if (flag.simple_mate_F) mate(*population, *buffer_ptr);
 
-        if (flag.niching_F) population->Niche(*buffer_ptr, 400);
+        if (flag.niching_F) population->Niche(*buffer_ptr, niche_size);
 
-        if (flag.clustering_F) int best_k = population->find_best_k2(30, *buffer_ptr);
+        if (flag.clustering_F) int best_k = population->find_best_k2(num_clusters, *buffer_ptr);
         
         if (flag.crowding_F) population->non_deterministic_crowding(*buffer_ptr, 0.1);
 
